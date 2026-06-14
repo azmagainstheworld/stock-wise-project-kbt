@@ -10,24 +10,34 @@ export default function BarangKeluar() {
   const [reasonType, setReasonType] = useState("out"); // out = penjualan, return = rusak/retur
   const [note, setNote] = useState("");
 
+  const [loading, setLoading] = useState(false);
+
   const selectedProduct = products.find(p => p.id === Number(productId));
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!productId) return alert("Pilih produk terlebih dahulu!");
     if (selectedProduct && selectedProduct.stock < Number(qty)) {
       return alert(`Stok tidak mencukupi! Sisa stok saat ini hanya ${selectedProduct.stock} unit.`);
     }
 
-    addTransaction({
-      productId: Number(productId),
-      type: reasonType, // "out" atau "return"
-      qty: Number(qty),
-      note: `Pelanggan/Tujuan: ${customer || "-"} | Alasan: ${reasonType === "out" ? "Penjualan" : "Retur Rusak"} | Catatan: ${note || "-"}`,
-      date: new Date().toLocaleString("id-ID"),
-    });
+    setLoading(true);
+    try {
+      await addTransaction({
+        productId: Number(productId),
+        type: reasonType, // "out" atau "return"
+        qty: Number(qty),
+        note: `Pelanggan/Tujuan: ${customer || "-"} | Alasan: ${reasonType === "out" ? "Penjualan" : "Retur Rusak"} | Catatan: ${note || "-"}`,
+        date: new Date().toLocaleString("id-ID"),
+      });
 
-    setQty(1); setCustomer(""); setNote("");
+      setQty(1); setCustomer(""); setNote("");
+      alert("Barang keluar berhasil dicatat!");
+    } catch (err) {
+      alert(err.response?.data?.message || "Terjadi kesalahan saat menyimpan transaksi");
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Filter riwayat khusus Barang Keluar dan Retur saja
@@ -125,9 +135,10 @@ export default function BarangKeluar() {
           <div className="flex justify-end pt-2">
             <button 
               type="submit" 
-              className="w-full sm:w-auto px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-sm transition-all shadow-md shadow-indigo-600/10 cursor-pointer"
+              disabled={loading}
+              className={`w-full sm:w-auto px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-sm transition-all shadow-md shadow-indigo-600/10 cursor-pointer ${loading ? 'opacity-70 cursor-not-allowed' : ''}`}
             >
-              Simpan
+              {loading ? "Menyimpan..." : "Simpan"}
             </button>
           </div>
         </form>

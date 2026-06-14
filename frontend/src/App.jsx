@@ -15,8 +15,16 @@ import Reports from "./pages/Reports";
 import Prediction from "./pages/Prediction";
 
 export default function App() {
-  const { user } = useContext(DataContext);
+  const { user, loadingInitial } = useContext(DataContext);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  if (loadingInitial) {
+    return (
+      <div className="w-screen h-screen flex items-center justify-center bg-[#f8fafc]">
+        <p className="text-gray-400 font-medium">Memuat sesi...</p>
+      </div>
+    );
+  }
 
   const LayoutWrapper = ({ children }) => {
     return (

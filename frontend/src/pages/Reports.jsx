@@ -1,21 +1,25 @@
-import React, { useContext, useState } from "react";
-import { DataContext } from "../context/DataContext";
+import React, { useEffect, useState } from "react";
+import api from "../utils/api";
 
 export default function Reports() {
-  const { products, transactions } = useContext(DataContext);
   const [range, setRange] = useState("daily");
+  const [data, setData] = useState({
+    summary: { in: 0, out: 0, totalStockEnd: 0, totalRecords: 0 },
+    transactions: [],
+  });
+  const [loading, setLoading] = useState(true);
 
-  // Agregasi Data Transaksi yang disempurnakan (termasuk tipe 'return')
-  const summary = {
-    in: transactions
-      .filter((t) => t.type === "in")
-      .reduce((s, t) => s + t.qty, 0),
-    out: transactions
-      .filter((t) => t.type === "out" || t.type === "return")
-      .reduce((s, t) => s + t.qty, 0),
-  };
+  useEffect(() => {
+    setLoading(true);
+    api.get(`/reports/stock?range=${range}`)
+      .then(res => setData(res.data))
+      .catch(err => console.error("Error fetching report", err))
+      .finally(() => setLoading(false));
+  }, [range]);
 
-  const totalStokAkhir = products.reduce((s, p) => s + p.stock, 0);
+  const summary = data.summary;
+  const transactions = data.transactions;
+  const totalStokAkhir = summary.totalStockEnd;
 
   return (
     <div className="space-y-6 pb-10">
@@ -99,8 +103,7 @@ export default function Reports() {
                   </td>
                 </tr>
               ) : (
-                [...transactions].reverse().map((tx) => {
-                  const linkedProd = products.find((p) => p.id === tx.productId);
+                transactions.map((tx) => {
                   
                   // badge kustomisasi untuk jenis transaksi harian
                   let typeBadge = "";
@@ -112,7 +115,7 @@ export default function Reports() {
                     <tr key={tx.id} className="hover:bg-gray-50/80 transition-colors">
                       <td className="px-6 py-4 text-xs text-gray-400 font-mono">{tx.date}</td>
                       <td className="px-6 py-4 font-semibold text-gray-800">
-                        {linkedProd ? linkedProd.name : "Varian Barang Terhapus"}
+                        {tx.productName || "Varian Barang Terhapus"}
                       </td>
                       <td className="px-6 py-4">
                         <span className={`px-2 py-0.5 border rounded-md text-[11px] font-bold ${typeBadge}`}>

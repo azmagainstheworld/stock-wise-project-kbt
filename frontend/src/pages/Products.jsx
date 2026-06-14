@@ -13,13 +13,22 @@ export default function Products() {
   const [name, setName] = useState("");
   const [sku, setSku] = useState("");
   const [price, setPrice] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const categories = ["Semua", "Obat", "Vitamin", "Alat Kesehatan", "Lainnya"];
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    addProduct({ name, sku, price: Number(price), stock: 0 });
-    setName(""); setSku(""); setPrice("");
+    setLoading(true);
+    try {
+      await addProduct({ name, sku, category: "Lainnya", price: Number(price), stock: 0 });
+      setName(""); setSku(""); setPrice("");
+      alert("Produk berhasil ditambahkan!");
+    } catch (err) {
+      alert(err.response?.data?.message || "Gagal menambahkan produk");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const filteredProducts = products.filter((prod) => {
@@ -67,9 +76,10 @@ export default function Products() {
           />
           <button 
             type="submit" 
-            className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl text-sm transition-all shadow-md shadow-indigo-600/10 cursor-pointer"
+            disabled={loading}
+            className={`w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl text-sm transition-all shadow-md shadow-indigo-600/10 cursor-pointer ${loading ? 'opacity-70 cursor-not-allowed' : ''}`}
           >
-            + Buat Katalog
+            {loading ? "Memproses..." : "+ Buat Katalog"}
           </button>
         </form>
       </div>

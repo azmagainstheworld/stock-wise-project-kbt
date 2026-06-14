@@ -1,71 +1,92 @@
 import React, { createContext, useState, useEffect } from "react";
+import api from "../utils/api";
 
 export const DataContext = createContext();
 
 export function DataProvider({ children }) {
   const [user, setUser] = useState(null); // {role: 'Owner'|'Staff', shopName}
-
-  const [products, setProducts] = useState([
-    { id: 1, name: "Tepung Terigu", sku: "SKU-001", price: 25000, stock: 50 },
-    { id: 2, name: "Gula Pasir", sku: "SKU-002", price: 15000, stock: 30 },
-  ]);
-
+  const [products, setProducts] = useState([]);
   const [transactions, setTransactions] = useState([]);
-
   const [threshold, setThreshold] = useState(5);
+  const [loadingInitial, setLoadingInitial] = useState(true);
 
+  // Auto login effect
   useEffect(() => {
-    // Example: persist to localStorage for dev convenience
-    const raw = localStorage.getItem("stockwise_data");
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      setProducts(parsed.products || []);
-      setTransactions(parsed.transactions || []);
-      setThreshold(parsed.threshold ?? 5);
+    const token = localStorage.getItem("stockwise_token");
+    if (token) {
+      api.get("/auth/me")
+        .then((res) => {
+          setUser(res.data.user);
+        })
+        .catch(() => {
+          localStorage.removeItem("stockwise_token");
+          setUser(null);
+        })
+        .finally(() => {
+          setLoadingInitial(false);
+        });
+    } else {
+      setLoadingInitial(false);
     }
   }, []);
 
+  // Fetch data after user is available
   useEffect(() => {
-    localStorage.setItem(
-      "stockwise_data",
-      JSON.stringify({ products, transactions, threshold }),
-    );
-  }, [products, transactions, threshold]);
+    if (user) {
+      Promise.all([
+        api.get("/products"),
+        api.get("/transactions"),
+        api.get("/settings/threshold").catch(() => ({ data: { threshold: 5 } })) // fallback
+      ]).then(([prodRes, transRes, threshRes]) => {
+        setProducts(prodRes.data.data || []);
+        setTransactions(transRes.data.data || []);
+        setThreshold(threshRes.data.threshold ?? 5);
+      }).catch(err => {
+        console.error("Failed to fetch initial data", err);
+      });
+    } else {
+      setProducts([]);
+      setTransactions([]);
+    }
+  }, [user]);
 
-  function handleRegister(payload) {
-    // TODO: Integrasi API Express JS dengan Axios
-    setUser(payload);
+  async function handleRegister(payload) {
+    const res = await api.post("/auth/register", payload);
+    localStorage.setItem("stockwise_token", res.data.token);
+    setUser(res.data.user);
   }
 
-  function handleLogin(creds) {
-    // TODO: Integrasi API Express JS dengan Axios
-    // Simulasi autentikasi: terima role dan shop
-    setUser(creds);
+  async function handleLogin(creds) {
+    const res = await api.post("/auth/login", creds);
+    localStorage.setItem("stockwise_token", res.data.token);
+    setUser(res.data.user);
   }
 
   function handleLogout() {
-    // Logout: clear user state
+    localStorage.removeItem("stockwise_token");
     setUser(null);
   }
 
-  function addProduct(p) {
-    // p: {name, sku, price, stock}
-    setProducts((prev) => [...prev, { id: Date.now(), ...p }]);
+  async function addProduct(p) {
+    const res = await api.post("/products", p);
+    const newProduct = res.data.data;
+    setProducts((prev) => [...prev, newProduct]);
+    return newProduct;
   }
 
-  function addTransaction(tx) {
-    // tx: {productId, type: 'in'|'out'|'return', qty, note, date}
-    setTransactions((prev) => [{ id: Date.now(), ...tx }, ...prev]);
-    setProducts((prev) =>
-      prev.map((prod) => {
-        if (prod.id === tx.productId) {
-          const delta =
-            tx.type === "in" ? tx.qty : tx.type === "out" ? -tx.qty : -tx.qty;
-          return { ...prod, stock: Math.max(0, prod.stock + delta) };
-        }
-        return prod;
-      }),
-    );
+  async function addTransaction(tx) {
+    const res = await api.post("/transactions", tx);
+    const { transaction, product } = res.data.data;
+    
+    setTransactions((prev) => [transaction, ...prev]);
+    setProducts((prev) => prev.map((prod) => prod.id === product.id ? product : prod));
+    
+    return res.data.data;
+  }
+
+  async function updateThreshold(newThreshold) {
+    const res = await api.patch("/settings/threshold", { threshold: newThreshold });
+    setThreshold(res.data.threshold);
   }
 
   const value = {
@@ -78,7 +99,8 @@ export function DataProvider({ children }) {
     transactions,
     addTransaction,
     threshold,
-    setThreshold,
+    setThreshold: updateThreshold,
+    loadingInitial,
   };
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;

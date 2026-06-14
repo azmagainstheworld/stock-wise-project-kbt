@@ -5,14 +5,23 @@ import { DataContext } from "../context/DataContext";
 export default function Login() {
   const { handleLogin } = useContext(DataContext);
   const [form, setForm] = useState({ email: "", password: "", role: "Owner" });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const navigate = useNavigate();
 
-  function submit(e) {
+  async function submit(e) {
     e.preventDefault();
-    // TODO: Integrasi API Express JS dengan Axios
-    handleLogin({ role: form.role, shopName: "My Shop", email: form.email });
-    if (form.role === "Owner") navigate("/dashboard");
-    else navigate("/workspace");
+    setLoading(true);
+    setError(null);
+    try {
+      await handleLogin({ email: form.email, password: form.password, role: form.role });
+      if (form.role === "Owner") navigate("/dashboard");
+      else navigate("/workspace");
+    } catch (err) {
+      setError(err.response?.data?.message || "Terjadi kesalahan saat login");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -37,6 +46,12 @@ export default function Login() {
 
           {/* FORM ISIAN */}
           <form onSubmit={submit} className="space-y-4">
+            
+            {error && (
+              <div className="bg-rose-50 text-rose-600 p-3 rounded-xl text-xs font-bold border border-rose-100">
+                {error}
+              </div>
+            )}
             
             {/* Input Email */}
             <div className="relative flex items-center">
@@ -97,9 +112,10 @@ export default function Login() {
             {/* Tombol Masuk Utama Indigo Modern */}
             <button
               type="submit"
-              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl transition-all duration-200 text-sm shadow-md shadow-indigo-600/10 mt-4 cursor-pointer"
+              disabled={loading}
+              className={`w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl transition-all duration-200 text-sm shadow-md shadow-indigo-600/10 mt-4 cursor-pointer ${loading ? 'opacity-70 cursor-not-allowed' : ''}`}
             >
-              Sign In
+              {loading ? "Memproses..." : "Sign In"}
             </button>
           </form>
         </div>

@@ -10,22 +10,32 @@ export default function BarangMasuk() {
   const [invoice, setInvoice] = useState("");
   const [note, setNote] = useState("");
 
+  const [loading, setLoading] = useState(false);
+
   const selectedProduct = products.find(p => p.id === Number(productId));
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!productId) return alert("Pilih produk terlebih dahulu!");
 
-    addTransaction({
-      productId: Number(productId),
-      type: "in",
-      qty: Number(qty),
-      note: `Supplier: ${supplier || "-"} | No. Faktur: ${invoice || "-"} | Catatan: ${note || "-"}`,
-      date: new Date().toLocaleString("id-ID"),
-    });
+    setLoading(true);
+    try {
+      await addTransaction({
+        productId: Number(productId),
+        type: "in",
+        qty: Number(qty),
+        note: `Supplier: ${supplier || "-"} | No. Faktur: ${invoice || "-"} | Catatan: ${note || "-"}`,
+        date: new Date().toLocaleString("id-ID"),
+      });
 
-    // Reset Form
-    setQty(1); setSupplier(""); setInvoice(""); setNote("");
+      // Reset Form
+      setQty(1); setSupplier(""); setInvoice(""); setNote("");
+      alert("Barang masuk berhasil dicatat!");
+    } catch (err) {
+      alert(err.response?.data?.message || "Terjadi kesalahan saat menyimpan transaksi");
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Filter riwayat khusus Barang Masuk saja (type === "in")
@@ -122,9 +132,10 @@ export default function BarangMasuk() {
           <div className="flex justify-end pt-2">
             <button 
               type="submit" 
-              className="w-full sm:w-auto px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-sm transition-all shadow-md shadow-indigo-600/10 cursor-pointer"
+              disabled={loading}
+              className={`w-full sm:w-auto px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-sm transition-all shadow-md shadow-indigo-600/10 cursor-pointer ${loading ? 'opacity-70 cursor-not-allowed' : ''}`}
             >
-              Simpan
+              {loading ? "Menyimpan..." : "Simpan"}
             </button>
           </div>
         </form>

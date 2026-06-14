@@ -1,43 +1,43 @@
-import React, { useContext } from "react";
+import React, { useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { DataContext } from "../context/DataContext";
 import StockChart from "../components/StockChart";
-import NotificationBell from "../components/NotificationBell"; // Tambahkan ini
+import NotificationBell from "../components/NotificationBell";
+import api from "../utils/api";
 
 export default function Dashboard() {
-  const { products, transactions, user, threshold } = useContext(DataContext);
+  const { products, user, threshold } = useContext(DataContext);
   const navigate = useNavigate();
 
-  // 1. Hitung Real-time Data untuk Summary Cards
-  const totalProduk = products.length;
-  
-  const totalMasukHariIni = transactions
-    .filter(tx => tx.type === "in")
-    .reduce((sum, tx) => sum + tx.qty, 0);
+  const [summary, setSummary] = useState({
+    totalProducts: 0,
+    totalStock: 0,
+    totalInToday: 0,
+    totalOutToday: 0,
+    salesValue7Days: 0,
+    lowStockCount: 0,
+    lowStockItems: [],
+    recentActivities: [],
+    chartData: [],
+    threshold: 5
+  });
+  const [loading, setLoading] = useState(true);
 
-  const totalKeluarHariIni = transactions
-    .filter(tx => tx.type === "out")
-    .reduce((sum, tx) => sum + tx.qty, 0);
+  useEffect(() => {
+    api.get("/dashboard/summary")
+      .then(res => setSummary(res.data))
+      .catch(err => console.error("Error fetching dashboard summary", err))
+      .finally(() => setLoading(false));
+  }, []);
 
-  // Ambil list produk yang stoknya di bawah threshold peringatan
-  const lowStockItems = products.filter(p => p.stock <= (threshold || 5));
-  const lowStockCount = lowStockItems.length;
-
-  // 2. Ambil 4 Transaksi Terakhir secara Dinamis untuk "Recent Activity"
-  const recentActivities = [...transactions]
-    .reverse()
-    .slice(0, 4);
-
-  // 3. Data Dummy Grafik Penjualan 7 Hari Terakhir
-  const chartData = [
-    { date: "12/5", stock: 4000000 },
-    { date: "13/5", stock: 6000000 },
-    { date: "14/5", stock: 8500000 },
-    { date: "15/5", stock: 7500000 },
-    { date: "16/5", stock: 9000000 },
-    { date: "17/5", stock: 14000000 },
-    { date: "18/5", stock: 12500000 },
-  ];
+  const totalProduk = summary.totalProducts;
+  const totalMasukHariIni = summary.totalInToday;
+  const totalKeluarHariIni = summary.totalOutToday;
+  const lowStockItems = summary.lowStockItems;
+  const lowStockCount = summary.lowStockCount;
+  const recentActivities = summary.recentActivities;
+  const chartData = summary.chartData;
+  const currentThreshold = summary.threshold || threshold || 5;
 
   return (
     <div className="space-y-6 pb-10">
@@ -101,7 +101,7 @@ export default function Dashboard() {
         <div className="mb-4">
           <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400">Penjualan 7 Hari Terakhir</h3>
           <div className="flex items-baseline gap-2 mt-0.5">
-            <span className="text-2xl font-black text-gray-800">Rp 12.500.000</span>
+            <span className="text-2xl font-black text-gray-800">Rp {summary.salesValue7Days.toLocaleString("id-ID")}</span>
             <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md">+12.5%</span>
           </div>
         </div>
@@ -129,15 +129,15 @@ export default function Dashboard() {
                       <div className="flex items-center gap-3">
                         <span className="text-lg">{isStockIn ? "📥" : "📤"}</span>
                         <div>
-                          <p className="text-sm font-bold text-gray-800">{targetProd?.name || "Varian Terhapus"}</p>
-                          <p className="text-xs text-gray-400 font-medium">SKU: {targetProd?.sku || "-"}</p>
+                          <p className="text-sm font-bold text-gray-800">{tx.product_name || targetProd?.name || "Varian Terhapus"}</p>
+                          <p className="text-xs text-gray-400 font-medium">SKU: {tx.sku || targetProd?.sku || "-"}</p>
                         </div>
                       </div>
                       <div className="text-right">
                         <p className={`text-sm font-black ${isStockIn ? "text-emerald-600" : "text-rose-600"}`}>
                           {isStockIn ? `+${tx.qty}` : `-${tx.qty}`} Unit
                         </p>
-                        <p className="text-[10px] text-gray-400 font-mono mt-0.5">{tx.date?.split(" ")[0] || "Hari ini"}</p>
+                        <p className="text-[10px] text-gray-400 font-mono mt-0.5">{tx.occurred_at ? new Date(tx.occurred_at).toLocaleDateString('id-ID') : (tx.date?.split(" ")[0] || "Hari ini")}</p>
                       </div>
                     </div>
                   );
@@ -165,7 +165,7 @@ export default function Dashboard() {
               ) : (
                 lowStockItems.slice(0, 3).map((item) => {
                   // Hitung persentase bar (Maksimal diukur dari batas aman threshold + 10)
-                  const safetyLimit = (threshold || 5) + 10;
+                  const safetyLimit = currentThreshold + 10;
                   const currentPercentage = Math.min(100, (item.stock / safetyLimit) * 100);
 
                   return (
@@ -181,7 +181,7 @@ export default function Dashboard() {
                       <div className="space-y-1 pt-1">
                         <div className="flex justify-between text-[10px] font-bold">
                           <span className="text-rose-600">Stock: {item.stock}</span>
-                          <span className="text-gray-400">Alert Limit: {threshold || 5}</span>
+                          <span className="text-gray-400">Alert Limit: {currentThreshold}</span>
                         </div>
                         <div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
                           <div 
